@@ -3,14 +3,36 @@
 #include "./config/phconfig.h"
 #include "./utils/getWindowsVersion.h"
 #include "./src/gpuMonitor.h"
+#include "./utils/Handles.h"
+#include "./utils/common.h"
+
+#pragma comment(lib, "cfgmgr32.lib")
+
+static char* TAG = "main.cpp:\t";
 
 int main()
 {
-    ULONG WindowsVersion = 0;
-    WindowsVersion = getWindowsVersion();
-    printf("Vesion: %ul.\n", WindowsVersion);
+    if (!loadDll())
+    {
+        LOGE << TAG << "loadDll Error.\n";
+        return 1;
+    }
+
+    if (!loadFunc())
+    {
+        LOGE << TAG << "loadFunc Error.\n";
+        return 1;
+    }
+
+    //ULONG WindowsVersion = 0;
+    //WindowsVersion = getWindowsVersion();
+    //printf("Vesion: %ul.\n", WindowsVersion);
 
     GpuMonitor monitor;
+    if (!monitor.start())
+    {
+        LOGE << TAG << "monitor.start failed.\n";
+    }
 
     return 0;
 }

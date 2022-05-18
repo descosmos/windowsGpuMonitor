@@ -3,11 +3,11 @@
 #include "../config/phconfig.h"
 #include "common.h"
 #include "getWindowsVersion.h"
+#include "Handles.h"
 
-const char* TAG = "getWindowsVersion.cpp:\t";
+static char* TAG = "getWindowsVersion.cpp:\t";
 
-typedef LONG(WINAPI* RtlGetVersion) (RTL_OSVERSIONINFOW*);
-RtlGetVersion fnRtlGetVersion;
+extern RtlGetVersion fnRtlGetVersion;
 
 ULONG getWindowsVersion() {
     ULONG WindowsVersion = 0;
@@ -18,20 +18,6 @@ ULONG getWindowsVersion() {
     ULONG    minorVersion = 0;
     ULONG    buildVersion = 0;
     RTL_OSVERSIONINFOW VersionInformation = { 0 };
-    DWORD OsVersion;
-
-    hNtdll = GetModuleHandle("ntdll.dll");
-    if (hNtdll == NULL) {
-        LOGE << TAG << "GetModuleHandle Error.\n";
-        return 1;
-    }
-
-    fnRtlGetVersion = (RtlGetVersion)GetProcAddress(hNtdll, "RtlGetVersion");
-    if (fnRtlGetVersion == NULL) {
-        LOGE << TAG << "GetProcAddress Error.\n";
-        printf("GetProcAddress Error.\n");
-        return 1;
-    }
 
     VersionInformation.dwOSVersionInfoSize = sizeof(RTL_OSVERSIONINFOW);
     ntStatus = fnRtlGetVersion(&VersionInformation);

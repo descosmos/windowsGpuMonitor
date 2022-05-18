@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "../d3dkmt/d3dkmthk.h"
 #include "../config/dltmgr.h"
+#include "../config/ntifs.h"
 
 #ifndef GPU_DATA_LIST_SIZE
 #define GPU_DATA_LIST_SIZE 5
@@ -54,13 +55,22 @@ public:
     ~GpuMonitor();
 
     bool start();
-    bool collect();
+    std::vector<FLOAT_ULONG64> collect();
     bool stop();
+
+private:
+    bool initializeD3DStatistics();
+    bool PhHeapInitialization(SIZE_T HeapReserveSize, SIZE_T HeapCommitSize);
+    bool PhInitializeWindowsVersion();
 
 private:
     BOOLEAN EtGpuEnabled_ = FALSE;
     BOOLEAN EtGpuSupported_ = FALSE;
     BOOLEAN EtD3DEnabled_ = FALSE;
+
+    PVOID PhInstanceHandle_ = NULL;
+    PVOID PhHeapHandle_ = NULL;
+    ULONG windowsVersion_ = { 0 };
 
     ULONG EtGpuTotalNodeCount_ = 0;
     ULONG EtGpuTotalSegmentCount_ = 0;
