@@ -21,14 +21,19 @@ set(SRC_SOURCES
 	"src/gpuMonitor.cpp" 
 	"config/ntifs.h"   
 	"config/phnt.h" 
-	"config/phnt_windows.h")
+	"config/phnt_windows.h" 
+	"config/ntrtl.h" 
+	 "config/refp.h")
 
 set(UTILS_SOURCES
-	"./utils/common.h"
-	"./utils/getWindowsVersion.h"
-	"./utils/getWindowsVersion.cpp" 
+	"utils/common.h"
+	"utils/getWindowsVersion.h"
+	"utils/getWindowsVersion.cpp" 
 	"utils/Handles.h" 
-	"utils/Handles.cpp")
+	"utils/Handles.cpp"
+	"utils/baseup.h"
+	"utils/baseup.cpp"
+	)
 
 
 # Add source to this project's executable.

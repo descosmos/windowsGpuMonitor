@@ -125,26 +125,26 @@ typedef enum _WAIT_TYPE
 
 // Strings
 
-typedef struct _STRING
-{
-    USHORT Length;
-    USHORT MaximumLength;
-    _Field_size_bytes_part_opt_(MaximumLength, Length) PCHAR Buffer;
-} STRING, * PSTRING, ANSI_STRING, * PANSI_STRING, OEM_STRING, * POEM_STRING;
+//typedef struct _STRING
+//{
+//    USHORT Length;
+//    USHORT MaximumLength;
+//    _Field_size_bytes_part_opt_(MaximumLength, Length) PCHAR Buffer;
+//} STRING, * PSTRING, ANSI_STRING, * PANSI_STRING, OEM_STRING, * POEM_STRING;
 
 typedef STRING UTF8_STRING;
 typedef PSTRING PUTF8_STRING;
 
 typedef const STRING* PCSTRING;
-typedef const ANSI_STRING* PCANSI_STRING;
+//typedef const ANSI_STRING* PCANSI_STRING;
 typedef const OEM_STRING* PCOEM_STRING;
 
-typedef struct _UNICODE_STRING
-{
-    USHORT Length;
-    USHORT MaximumLength;
-    _Field_size_bytes_part_(MaximumLength, Length) PWCH Buffer;
-} UNICODE_STRING, * PUNICODE_STRING;
+//typedef struct _UNICODE_STRING
+//{
+//    USHORT Length;
+//    USHORT MaximumLength;
+//    _Field_size_bytes_part_(MaximumLength, Length) PWCH Buffer;
+//} UNICODE_STRING, * PUNICODE_STRING;
 
 typedef const UNICODE_STRING* PCUNICODE_STRING;
 
@@ -219,15 +219,15 @@ typedef STRING64 ANSI_STRING64, * PANSI_STRING64;
 #define OBJ_DONT_REPARSE 0x00001000
 #define OBJ_VALID_ATTRIBUTES 0x00001ff2
 
-typedef struct _OBJECT_ATTRIBUTES
-{
-    ULONG Length;
-    HANDLE RootDirectory;
-    PUNICODE_STRING ObjectName;
-    ULONG Attributes;
-    PVOID SecurityDescriptor; // PSECURITY_DESCRIPTOR;
-    PVOID SecurityQualityOfService; // PSECURITY_QUALITY_OF_SERVICE
-} OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
+//typedef struct _OBJECT_ATTRIBUTES
+//{
+//    ULONG Length;
+//    HANDLE RootDirectory;
+//    PUNICODE_STRING ObjectName;
+//    ULONG Attributes;
+//    PVOID SecurityDescriptor; // PSECURITY_DESCRIPTOR;
+//    PVOID SecurityQualityOfService; // PSECURITY_QUALITY_OF_SERVICE
+//} OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
 
 typedef const OBJECT_ATTRIBUTES* PCOBJECT_ATTRIBUTES;
 
@@ -304,11 +304,11 @@ typedef enum _SUITE_TYPE
 
 // Specific
 
-typedef struct _CLIENT_ID
-{
-    HANDLE UniqueProcess;
-    HANDLE UniqueThread;
-} CLIENT_ID, * PCLIENT_ID;
+//typedef struct _CLIENT_ID
+//{
+//    HANDLE UniqueProcess;
+//    HANDLE UniqueThread;
+//} CLIENT_ID, * PCLIENT_ID;
 
 typedef struct _CLIENT_ID32
 {

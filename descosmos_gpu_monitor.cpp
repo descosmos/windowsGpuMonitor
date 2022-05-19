@@ -34,5 +34,6 @@ int main()
         LOGE << TAG << "monitor.start failed.\n";
     }
 
+    LOGI << TAG << "process exit sucessfully.\n";
     return 0;
 }

@@ -13,6 +13,11 @@
 #define GPU_DATA_LIST_SIZE 5
 #endif // !GPU_DATA_LIST_SIZE
 
+// Macros
+
+#define BYTES_NEEDED_FOR_BITS(Bits) ((((Bits) + sizeof(ULONG) * 8 - 1) / 8) & ~(SIZE_T)(sizeof(ULONG) - 1)) // divide round up
+
+// Structures
 
 typedef struct _D3DKMT_QUERYSTATISTICS_SEGMENT_INFORMATION_V1
 {
@@ -62,6 +67,16 @@ private:
     bool initializeD3DStatistics();
     bool PhHeapInitialization(SIZE_T HeapReserveSize, SIZE_T HeapCommitSize);
     bool PhInitializeWindowsVersion();
+    bool EtpIsGpuSoftwareDevice(_In_ D3DKMT_HANDLE AdapterHandle);
+    NTSTATUS EtQueryAdapterInformation(
+        _In_ D3DKMT_HANDLE AdapterHandle,
+        _In_ KMTQUERYADAPTERINFOTYPE InformationClass,
+        _Out_writes_bytes_opt_(InformationLength) PVOID Information,
+        _In_ UINT32 InformationLength
+    );
+    BOOLEAN EtCloseAdapterHandle(
+        _In_ D3DKMT_HANDLE AdapterHandle
+    );
 
 private:
     BOOLEAN EtGpuEnabled_ = FALSE;
@@ -77,6 +92,9 @@ private:
 
     PH_UINT64_DELTA EtClockTotalRunningTimeDelta_ = { 0, 0 };
     LARGE_INTEGER EtClockTotalRunningTimeFrequency_ = { 0 };
+
+    ULONG64 EtGpuDedicatedLimit_ = { 0 };
+    ULONG64 EtGpuSharedLimit_ = { 0 };
 
     std::vector<FLOAT_ULONG64> dataList_;
 };

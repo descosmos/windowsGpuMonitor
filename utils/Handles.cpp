@@ -4,10 +4,11 @@
 
 static const char* TAG = "lHandles.cpp:\t";
 
-/**
-* Ntdll.dll
-*/
+static const char* ntdllPath = "ntdll.dll";
+static const char* gdi32Path = "gdi32.dll";
+
 static HMODULE hNtdll;
+static HMODULE gdi32dll;
 
 RtlGetVersion fnRtlGetVersion;
 RtlCreateHeap fnRtlCreateHeap;
@@ -19,83 +20,109 @@ RtlZeroHeap fnRtlZeroHeap;
 RtlSetHeapInformation fnRtlSetHeapInformation;
 RtlQueryHeapInformation fnRtlQueryHeapInformation;
 
+//D3DKMTOpenAdapterFromDeviceName fnD3DKMTOpenAdapterFromDeviceName;
+//D3DKMTQueryAdapterInfo fnD3DKMTQueryAdapterInfo;
 
 bool loadDll() 
 {   
-    hNtdll = GetModuleHandle("ntdll.dll");
+    hNtdll = GetModuleHandle(ntdllPath);
     if (hNtdll == nullptr) {
-        LOGI << TAG << "GetModuleHandle Error.\n";
+        LOGI << TAG << "Load ntdll.dll Error.\n";
         return false;
     }
+
+	gdi32dll = GetModuleHandle(gdi32Path);
+	if (gdi32dll == nullptr) {
+		LOGI << TAG << "Load gdi32.dll Error.\n";
+		return false;
+	}
+
 	return true;
 }
 
 bool loadFunc()
 {
-	fnRtlGetVersion = (RtlGetVersion)getFuncFromNtdll("RtlGetVersion");
+	/*
+		ntdll.dll
+	*/
+	fnRtlGetVersion = (RtlGetVersion)getFuncFromNtdll(hNtdll, "RtlGetVersion");
 	if (fnRtlGetVersion == NULL) {
-		LOGI << TAG << "Get fnRtlGetVersion Error.\n";
+		LOGE << TAG << "Get fnRtlGetVersion Error.\n";
 		return false;
 	}
 
-	fnRtlCreateHeap = (RtlCreateHeap)getFuncFromNtdll("RtlCreateHeap");
+	fnRtlCreateHeap = (RtlCreateHeap)getFuncFromNtdll(hNtdll, "RtlCreateHeap");
 	if (fnRtlCreateHeap == NULL) {
-		LOGI << TAG << "Get fnRtlCreateHeap Error.\n";
+		LOGE << TAG << "Get fnRtlCreateHeap Error.\n";
 		return false;
 	}
 
-	fnRtlDestroyHeap = (RtlDestroyHeap)getFuncFromNtdll("RtlDestroyHeap");
+	fnRtlDestroyHeap = (RtlDestroyHeap)getFuncFromNtdll(hNtdll, "RtlDestroyHeap");
 	if (fnRtlDestroyHeap == NULL) {
-		LOGI << TAG << "Get fnRtlDestroyHeap Error.\n";
+		LOGE << TAG << "Get fnRtlDestroyHeap Error.\n";
 		return false;
 	}
 
-	fnRtlAllocateHeap = (RtlAllocateHeap)getFuncFromNtdll("RtlAllocateHeap");
+	fnRtlAllocateHeap = (RtlAllocateHeap)getFuncFromNtdll(hNtdll, "RtlAllocateHeap");
 	if (fnRtlAllocateHeap == NULL) {
-		LOGI << TAG << "Get fnRtlAllocateHeap Error.\n";
+		LOGE << TAG << "Get fnRtlAllocateHeap Error.\n";
 		return false;
 	}
 
-	fnRtlFreeHeap = (RtlFreeHeap)getFuncFromNtdll("RtlFreeHeap");
+	fnRtlFreeHeap = (RtlFreeHeap)getFuncFromNtdll(hNtdll, "RtlFreeHeap");
 	if (fnRtlFreeHeap == NULL) {
-		LOGI << TAG << "Get fnRtlFreeHeap Error.\n";
+		LOGE << TAG << "Get fnRtlFreeHeap Error.\n";
 		return false;
 	}
 
-	fnRtlSizeHeap = (RtlSizeHeap)getFuncFromNtdll("RtlSizeHeap");
+	fnRtlSizeHeap = (RtlSizeHeap)getFuncFromNtdll(hNtdll, "RtlSizeHeap");
 	if (fnRtlSizeHeap == NULL) {
-		LOGI << TAG << "Get fnRtlSizeHeap Error.\n";
+		LOGE << TAG << "Get fnRtlSizeHeap Error.\n";
 		return false;
 	}
 
-	fnRtlZeroHeap = (RtlZeroHeap)getFuncFromNtdll("RtlZeroHeap");
+	fnRtlZeroHeap = (RtlZeroHeap)getFuncFromNtdll(hNtdll, "RtlZeroHeap");
 	if (fnRtlZeroHeap == NULL) {
-		LOGI << TAG << "Get fnRtlZeroHeap Error.\n";
+		LOGE << TAG << "Get fnRtlZeroHeap Error.\n";
 		return false;
 	}
 
-	fnRtlSetHeapInformation = (RtlSetHeapInformation)getFuncFromNtdll("RtlSetHeapInformation");
+	fnRtlSetHeapInformation = (RtlSetHeapInformation)getFuncFromNtdll(hNtdll, "RtlSetHeapInformation");
 	if (fnRtlSetHeapInformation == NULL) {
-		LOGI << TAG << "Get fnRtlSetHeapInformation Error.\n";
+		LOGE << TAG << "Get fnRtlSetHeapInformation Error.\n";
 		return false;
 	}
 
-	fnRtlQueryHeapInformation = (RtlQueryHeapInformation)getFuncFromNtdll("RtlQueryHeapInformation");
+	fnRtlQueryHeapInformation = (RtlQueryHeapInformation)getFuncFromNtdll(hNtdll, "RtlQueryHeapInformation");
 	if (fnRtlQueryHeapInformation == NULL) {
-		LOGI << TAG << "Get fnRtlQueryHeapInformation Error.\n";
+		LOGE << TAG << "Get fnRtlQueryHeapInformation Error.\n";
 		return false;
 	}
+
+	/*
+		gdi32.dll
+	*/
+	//fnD3DKMTOpenAdapterFromDeviceName = (D3DKMTOpenAdapterFromDeviceName)getFuncFromNtdll(gdi32dll, "D3DKMTOpenAdapterFromDeviceName");
+	//if (fnD3DKMTOpenAdapterFromDeviceName == NULL) {
+	//	LOGE << TAG << "Get fnD3DKMTOpenAdapterFromDeviceName Error.\n";
+	//	return false;
+	//}
+
+	//fnD3DKMTQueryAdapterInfo = (D3DKMTQueryAdapterInfo)getFuncFromNtdll(gdi32dll, "D3DKMTQueryAdapterInfo");
+	//if (fnD3DKMTQueryAdapterInfo == NULL) {
+	//	LOGE << TAG << "Get fnD3DKMTQueryAdapterInfo Error.\n";
+	//	return false;
+	//}
 
     return true;
 }
 
-void* getFuncFromNtdll(const char* funName)
+void* getFuncFromNtdll(HMODULE dllHandle, const char* funName)
 {
     void* func = nullptr;
-    func = GetProcAddress(hNtdll, "RtlGetVersion");
+    func = GetProcAddress(dllHandle, funName);
     if (func == nullptr) {
-        LOGI << TAG << "GetProcAddress Error.\n";
-        printf("GetProcAddress Error.\n");
+        LOGE << TAG << "getFuncFromNtdll Error.\n";
         return nullptr;
     }
 
