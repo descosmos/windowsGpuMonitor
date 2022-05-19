@@ -15,6 +15,7 @@
 #include "../config/phnt.h"
 #include "../config/phnt_windows.h"
 #include "../config/refp.h"
+#include "../config/dltmgr.h"
 
 #include "../utils/common.h"
 #include "../utils/getWindowsVersion.h"
@@ -37,6 +38,7 @@ extern RtlQueryHeapInformation fnRtlQueryHeapInformation;
 
 GpuMonitor::GpuMonitor()
 {
+	dataList_.reserve(5);
 }
 
 GpuMonitor::~GpuMonitor()
@@ -55,11 +57,53 @@ bool GpuMonitor::start()
 		EtGpuEnabled_ = true;
 	}
 
+	EtGpuNodesTotalRunningTimeDelta_.resize(EtGpuTotalNodeCount_);
+
 	return true;
 }
 
 std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 {
+	static ULONG runCount = 0; // MUST keep in sync with runCount in process provider
+	DOUBLE elapsedTime = 0; // total GPU node elapsed time in micro-seconds
+	FLOAT tempGpuUsage = 0;
+	ULONG i;
+	PLIST_ENTRY listEntry;
+	FLOAT maxNodeValue = 0;
+	//PET_PROCESS_BLOCK maxNodeBlock = NULL;
+
+	EtpUpdateSystemSegmentInformation();
+	EtpUpdateSystemNodeInformation();
+
+	elapsedTime = (DOUBLE)(EtClockTotalRunningTimeDelta_.Delta * 10000000) / EtClockTotalRunningTimeFrequency_.QuadPart;
+
+	if (elapsedTime != 0)
+	{
+		for (i = 0; i < EtGpuTotalNodeCount_; i++)
+		{
+			FLOAT usage = (FLOAT)(EtGpuNodesTotalRunningTimeDelta_[i]->Delta / elapsedTime);
+			LOGI << TAG << "EtGpuNodesTotalRunningTimeDelta_[i]->Delta.\n";
+
+			if (usage > 1)
+				usage = 1;
+
+			if (usage > tempGpuUsage)
+				tempGpuUsage = usage;
+		}
+	}
+
+	EtGpuNodeUsage_ = tempGpuUsage;
+
+	//	TODO: fixme
+	dataList_[GPU_UTILIZATION].float_ = EtGpuNodeUsage_;
+	dataList_[GPU_DEDICATED_USAGE].ulong64_ = EtGpuDedicatedUsage_;
+	dataList_[GPU_DEDICATED_LIMIT].ulong64_ = EtGpuDedicatedLimit_;
+	dataList_[GPU_SHARED_USAGE].ulong64_ = EtGpuSharedUsage_;
+	dataList_[GPU_SHARED_LIMIT].ulong64_ = EtGpuSharedLimit_;
+
+	runCount++;
+
+	LOGI << TAG << "collect successfully.\n";
 	return dataList_;
 }
 
@@ -106,7 +150,7 @@ bool GpuMonitor::initializeD3DStatistics()
 		return FALSE;
 	}
 
-	deviceAdapterList.reserve(0);	//	TODO: explain why 0
+	deviceAdapterList.resize(0);	//	TODO: explain why 0
 
 	for (deviceInterface = deviceInterfaceList; *deviceInterface; deviceInterface += PhCountStringZ(deviceInterface) + 1)
 	{
@@ -171,6 +215,12 @@ bool GpuMonitor::initializeD3DStatistics()
 
 		if (NT_SUCCESS(D3DKMTQueryStatistics(&queryStatistics)))
 		{
+			PETP_GPU_ADAPTER gpuAdapter = new ETP_GPU_ADAPTER();
+			gpuAdapter->AdapterLuid = openAdapterFromDeviceName.AdapterLuid;
+			gpuAdapter->NodeCount = queryStatistics.QueryResult.AdapterInformation.NodeCount;
+			gpuAdapter->SegmentCount = queryStatistics.QueryResult.AdapterInformation.NbSegments;
+			gpuAdapterList_.push_back(gpuAdapter);
+
 			EtGpuTotalNodeCount_ += queryStatistics.QueryResult.AdapterInformation.NodeCount;
 			EtGpuTotalSegmentCount_ += queryStatistics.QueryResult.AdapterInformation.NbSegments;
 
@@ -312,4 +362,100 @@ NTSTATUS GpuMonitor::EtQueryAdapterInformation(D3DKMT_HANDLE AdapterHandle, KMTQ
 BOOLEAN GpuMonitor::EtCloseAdapterHandle(D3DKMT_HANDLE AdapterHandle)
 {
 	return BOOLEAN();
+}
+
+void GpuMonitor::EtpUpdateSystemSegmentInformation()
+{
+	ULONG i;
+	ULONG j;
+	PETP_GPU_ADAPTER gpuAdapter;
+	D3DKMT_QUERYSTATISTICS queryStatistics;
+	ULONG64 dedicatedUsage;
+	ULONG64 sharedUsage;
+
+	dedicatedUsage = 0;
+	sharedUsage = 0;
+
+	for (i = 0; i < gpuAdapterList_.size(); i++)
+	{
+		gpuAdapter = gpuAdapterList_[i];
+
+		for (j = 0; j < gpuAdapter->SegmentCount; j++)
+		{
+			LOGI << TAG << "EtpUpdateSystemSegmentInformation gpuAdapter->SegmentCount.\n";
+			memset(&queryStatistics, 0, sizeof(D3DKMT_QUERYSTATISTICS));
+			queryStatistics.Type = D3DKMT_QUERYSTATISTICS_SEGMENT;
+			queryStatistics.AdapterLuid = gpuAdapter->AdapterLuid;
+			queryStatistics.QuerySegment.SegmentId = j;
+
+			if (NT_SUCCESS(D3DKMTQueryStatistics(&queryStatistics)))
+			{
+				LOGI << TAG << "EtpUpdateSystemSegmentInformation D3DKMT_QUERYSTATISTICS_SEGMENT D3DKMTQueryStatistics.\n";
+				ULONG64 bytesCommitted;
+				ULONG aperture;
+
+				if (windowsVersion_ >= WINDOWS_8)
+				{
+					bytesCommitted = queryStatistics.QueryResult.SegmentInformation.BytesResident;
+					aperture = queryStatistics.QueryResult.SegmentInformation.Aperture;
+				}
+				else
+				{
+					PD3DKMT_QUERYSTATISTICS_SEGMENT_INFORMATION_V1 segmentInfo;
+
+					segmentInfo = (PD3DKMT_QUERYSTATISTICS_SEGMENT_INFORMATION_V1)&queryStatistics.QueryResult;
+					bytesCommitted = segmentInfo->BytesResident;
+					aperture = segmentInfo->Aperture;
+				}
+
+				if (aperture) // RtlCheckBit(&gpuAdapter->ApertureBitMap, j)
+					sharedUsage += bytesCommitted;
+				else
+					dedicatedUsage += bytesCommitted;
+			}
+		}
+	}
+
+	EtGpuDedicatedUsage_ = dedicatedUsage;
+	EtGpuSharedUsage_ = sharedUsage;
+	LOGI << TAG << "EtpUpdateSystemSegmentInformation exit.\n";
+}
+
+void GpuMonitor::EtpUpdateSystemNodeInformation()
+{
+	ULONG i;
+	ULONG j;
+	PETP_GPU_ADAPTER gpuAdapter;
+	D3DKMT_QUERYSTATISTICS queryStatistics;
+	ULONG64 totalRunningTime;
+
+	totalRunningTime = 0;
+
+	for (i = 0; i < gpuAdapterList_.size(); i++)
+	{
+		gpuAdapter = gpuAdapterList_[i];
+		for (j = 0; j < gpuAdapter->NodeCount; j++)
+		{
+			LOGI << TAG << "EtpUpdateSystemNodeInformation gpuAdapter->NodeCount.\n";
+			memset(&queryStatistics, 0, sizeof(D3DKMT_QUERYSTATISTICS));
+			queryStatistics.Type = D3DKMT_QUERYSTATISTICS_PROCESS_NODE;
+			queryStatistics.AdapterLuid = gpuAdapter->AdapterLuid;
+			queryStatistics.hProcess = GetCurrentProcess();		//	TODO: fixme get process handle by pid or other signature
+			queryStatistics.QueryProcessNode.NodeId = j;
+
+			if (NT_SUCCESS(D3DKMTQueryStatistics(&queryStatistics)))
+			{
+				LOGI << TAG << "EtpUpdateSystemNodeInformation D3DKMT_QUERYSTATISTICS_PROCESS_NODE D3DKMTQueryStatistics.\n";
+				//ULONG64 runningTime;
+				//runningTime = queryStatistics.QueryResult.ProcessNodeInformation.RunningTime.QuadPart;
+				//PhUpdateDelta(&Block->GpuTotalRunningTimeDelta[j], runningTime);
+
+				totalRunningTime += queryStatistics.QueryResult.ProcessNodeInformation.RunningTime.QuadPart;
+				//totalContextSwitches += queryStatistics.QueryResult.ProcessNodeInformation.ContextSwitch;
+			}
+		}
+	}
+
+	PhUpdateDelta(&GpuRunningTimeDelta_, totalRunningTime);
+	LOGI << TAG << "EtpUpdateSystemNodeInformation exit.\n";
 }

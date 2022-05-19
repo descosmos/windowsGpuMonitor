@@ -19,6 +19,25 @@
 
 // Structures
 
+typedef struct _ETP_GPU_ADAPTER
+{
+    _ETP_GPU_ADAPTER()
+    {
+
+    }
+    LUID AdapterLuid;
+    ULONG SegmentCount;
+    ULONG NodeCount;
+    //ULONG FirstNodeIndex;
+
+    //PPH_STRING DeviceInterface;
+    //PPH_STRING Description;
+    //PPH_LIST NodeNameList;
+
+    //RTL_BITMAP ApertureBitMap;
+    //ULONG ApertureBitMapBuffer[1];
+} ETP_GPU_ADAPTER, * PETP_GPU_ADAPTER;
+
 typedef struct _D3DKMT_QUERYSTATISTICS_SEGMENT_INFORMATION_V1
 {
     ULONG CommitLimit;
@@ -77,8 +96,12 @@ private:
     BOOLEAN EtCloseAdapterHandle(
         _In_ D3DKMT_HANDLE AdapterHandle
     );
+    void EtpUpdateSystemSegmentInformation();
+    void EtpUpdateSystemNodeInformation();
 
 private:
+    HANDLE processHandle = NULL;
+
     BOOLEAN EtGpuEnabled_ = FALSE;
     BOOLEAN EtGpuSupported_ = FALSE;
     BOOLEAN EtD3DEnabled_ = FALSE;
@@ -92,11 +115,18 @@ private:
 
     PH_UINT64_DELTA EtClockTotalRunningTimeDelta_ = { 0, 0 };
     LARGE_INTEGER EtClockTotalRunningTimeFrequency_ = { 0 };
+    PH_UINT64_DELTA GpuRunningTimeDelta_ = { 0, 0 };
+    std::vector<PPH_UINT64_DELTA> EtGpuNodesTotalRunningTimeDelta_;
+
+    FLOAT EtGpuNodeUsage_ = 0;
 
     ULONG64 EtGpuDedicatedLimit_ = { 0 };
     ULONG64 EtGpuSharedLimit_ = { 0 };
+    ULONG64 EtGpuDedicatedUsage_ = { 0 };
+    ULONG64 EtGpuSharedUsage_ = { 0 };
 
     std::vector<FLOAT_ULONG64> dataList_;
+    std::vector<PETP_GPU_ADAPTER> gpuAdapterList_;
 };
 
 
