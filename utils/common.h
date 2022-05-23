@@ -8,6 +8,6 @@
 #endif
 
 #define LOGI std::cout
-#define LOGE std::cerr
+#define LOGE std::cerr << "ERROR: "
 
 #endif

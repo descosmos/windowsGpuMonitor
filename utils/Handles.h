@@ -1,8 +1,9 @@
-#ifndef _RTL_HEAP_H
-#define _RTL_HEAP_H
+#ifndef _HANDLES_H
+#define _HANDLES_H
 
 #include <Windows.h>
-#include <../config/ntifs.h>
+#include "../config/ntifs.h"
+#include "../config/ntrtl.h"
 
 //	ntdll.dll
 typedef LONG(WINAPI* RtlGetVersion) (RTL_OSVERSIONINFOW*);
@@ -14,6 +15,15 @@ typedef SIZE_T(WINAPI* RtlSizeHeap) (PVOID HeapBase, ULONG Flags, PVOID BaseAddr
 typedef NTSTATUS(WINAPI* RtlZeroHeap) (PVOID HeapBase, ULONG Flags);
 typedef NTSTATUS(WINAPI* RtlSetHeapInformation) (PVOID HeapBase, HEAP_INFORMATION_CLASS HeapInformationClass, PVOID HeapInformation, SIZE_T HeapInformationLength);
 typedef NTSTATUS(WINAPI* RtlQueryHeapInformation) (PVOID HeapBase, HEAP_INFORMATION_CLASS HeapInformationClass, PVOID HeapInformation, SIZE_T HeapInformationLength, PSIZE_T ReturnLength);
+typedef BOOLEAN(NTAPI* RtlSetBits) (_In_ PRTL_BITMAP BitMapHeader,
+	_In_range_(0, BitMapHeader->SizeOfBitMap - NumberToClear) ULONG StartingIndex, 
+	_In_range_(0, BitMapHeader->SizeOfBitMap - StartingIndex) ULONG NumberToClear
+	);
+typedef VOID(NTAPI* RtlClearBits) (_In_ PRTL_BITMAP BitMapHeader,
+	_In_range_(0, BitMapHeader->SizeOfBitMap - NumberToClear) ULONG StartingIndex,
+	_In_range_(0, BitMapHeader->SizeOfBitMap - StartingIndex) ULONG NumberToClear
+	);
+typedef VOID(NTAPI* RtlInitializeBitMap) (_Out_ PRTL_BITMAP BitMapHeader, _In_ PULONG BitMapBuffer, _In_ ULONG SizeOfBitMap);
 
 //	gdi32.dll
 //typedef NTSTATUS(*D3DKMTOpenAdapterFromDeviceName) (_Inout_ D3DKMT_OPENADAPTERFROMDEVICENAME*);
@@ -26,4 +36,4 @@ void* getFuncFromNtdll(HMODULE dllHandle, const char* funName);
 void unLoadNtdll();
 
 
-#endif // !_RTL_HEAP_H
+#endif // !_HANDLES_H

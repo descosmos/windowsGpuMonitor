@@ -23,7 +23,8 @@ set(SRC_SOURCES
 	"config/phnt.h" 
 	"config/phnt_windows.h" 
 	"config/ntrtl.h" 
-	 "config/refp.h")
+	"config/refp.h" 
+	"config/phsup.h")
 
 set(UTILS_SOURCES
 	"utils/common.h"

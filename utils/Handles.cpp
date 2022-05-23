@@ -20,6 +20,10 @@ RtlZeroHeap fnRtlZeroHeap;
 RtlSetHeapInformation fnRtlSetHeapInformation;
 RtlQueryHeapInformation fnRtlQueryHeapInformation;
 
+RtlSetBits fnRtlSetBits;
+RtlClearBits fnRtlClearBits;
+RtlInitializeBitMap fnRtlInitializeBitMap;
+
 //D3DKMTOpenAdapterFromDeviceName fnD3DKMTOpenAdapterFromDeviceName;
 //D3DKMTQueryAdapterInfo fnD3DKMTQueryAdapterInfo;
 
@@ -96,6 +100,24 @@ bool loadFunc()
 	fnRtlQueryHeapInformation = (RtlQueryHeapInformation)getFuncFromNtdll(hNtdll, "RtlQueryHeapInformation");
 	if (fnRtlQueryHeapInformation == NULL) {
 		LOGE << TAG << "Get fnRtlQueryHeapInformation Error.\n";
+		return false;
+	}
+
+	fnRtlSetBits = (RtlSetBits)getFuncFromNtdll(hNtdll, "RtlSetBits");
+	if (fnRtlSetBits == NULL) {
+		LOGE << TAG << "Get fnRtlSetBits Error.\n";
+		return false;
+	}
+
+	fnRtlClearBits = (RtlClearBits)getFuncFromNtdll(hNtdll, "RtlClearBits");
+	if (fnRtlClearBits == NULL) {
+		LOGE << TAG << "Get fnRtlClearBits Error.\n";
+		return false;
+	}
+
+	fnRtlInitializeBitMap = (RtlInitializeBitMap)getFuncFromNtdll(hNtdll, "RtlInitializeBitMap");
+	if (fnRtlInitializeBitMap == NULL) {
+		LOGE << TAG << "Get fnRtlInitializeBitMap Error.\n";
 		return false;
 	}
 

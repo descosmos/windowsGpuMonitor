@@ -8,6 +8,7 @@
 #include "../d3dkmt/d3dkmthk.h"
 #include "../config/dltmgr.h"
 #include "../config/ntifs.h"
+#include "../config/ntrtl.h"
 
 #ifndef GPU_DATA_LIST_SIZE
 #define GPU_DATA_LIST_SIZE 5
@@ -34,8 +35,8 @@ typedef struct _ETP_GPU_ADAPTER
     //PPH_STRING Description;
     //PPH_LIST NodeNameList;
 
-    //RTL_BITMAP ApertureBitMap;
-    //ULONG ApertureBitMapBuffer[1];
+    RTL_BITMAP ApertureBitMap;
+    ULONG ApertureBitMapBuffer[1];
 } ETP_GPU_ADAPTER, * PETP_GPU_ADAPTER;
 
 typedef struct _D3DKMT_QUERYSTATISTICS_SEGMENT_INFORMATION_V1
@@ -59,10 +60,10 @@ typedef struct _D3DKMT_QUERYSTATISTICS_SEGMENT_INFORMATION_V1
 
 enum GpuMonitorDataIndex
 {
-    GPU_UTILIZATION = 0,
-    GPU_DEDICATED_USAGE = 1,
+    GPU_TARGET_PROCESS_UTILIZATION = 0,
+    GPU_TARGET_PROCESS_DEDICATED_USAGE = 1,
     GPU_DEDICATED_LIMIT = 2,
-    GPU_SHARED_USAGE = 3,
+    GPU_TARGET_PROCESS_SHARED_USAGE = 3,
     GPU_SHARED_LIMIT = 4
 };
 
@@ -75,7 +76,8 @@ union FLOAT_ULONG64
 
 class GpuMonitor {
 public:
-    GpuMonitor();
+    GpuMonitor() = delete;
+    GpuMonitor(DWORD targetProcessId);
     ~GpuMonitor();
 
     bool start();
@@ -86,6 +88,7 @@ private:
     bool initializeD3DStatistics();
     bool PhHeapInitialization(SIZE_T HeapReserveSize, SIZE_T HeapCommitSize);
     bool PhInitializeWindowsVersion();
+    bool openTargetProcessHandle(DWORD pid);
     bool EtpIsGpuSoftwareDevice(_In_ D3DKMT_HANDLE AdapterHandle);
     NTSTATUS EtQueryAdapterInformation(
         _In_ D3DKMT_HANDLE AdapterHandle,
@@ -98,9 +101,13 @@ private:
     );
     void EtpUpdateSystemSegmentInformation();
     void EtpUpdateSystemNodeInformation();
+    void PhQueryPerformanceCounter(_Out_ PLARGE_INTEGER PerformanceCounter, _Out_opt_ PLARGE_INTEGER PerformanceFrequency);
+    void EtpUpdateProcessSegmentInformation();
+    void EtpUpdateProcessNodeInformation();
 
 private:
-    HANDLE processHandle = NULL;
+    DWORD targetProcessId_ = 0;  //  TODO: 初始化输入需要检测进程的PID
+    HANDLE targetProcessHandle_ = NULL;
 
     BOOLEAN EtGpuEnabled_ = FALSE;
     BOOLEAN EtGpuSupported_ = FALSE;
@@ -116,7 +123,7 @@ private:
     PH_UINT64_DELTA EtClockTotalRunningTimeDelta_ = { 0, 0 };
     LARGE_INTEGER EtClockTotalRunningTimeFrequency_ = { 0 };
     PH_UINT64_DELTA GpuRunningTimeDelta_ = { 0, 0 };
-    std::vector<PPH_UINT64_DELTA> EtGpuNodesTotalRunningTimeDelta_;
+    std::vector<PH_UINT64_DELTA> EtGpuNodesTotalRunningTimeDelta_;
 
     FLOAT EtGpuNodeUsage_ = 0;
 
@@ -124,6 +131,11 @@ private:
     ULONG64 EtGpuSharedLimit_ = { 0 };
     ULONG64 EtGpuDedicatedUsage_ = { 0 };
     ULONG64 EtGpuSharedUsage_ = { 0 };
+
+    FLOAT targetProcessGpuUtilization_ = { 0 };
+    ULONG64 targetProcessGpuDedicatedUsage_ = { 0 };
+    ULONG64 targetProcessGpuSharedUsage_ = { 0 };
+    ULONG64 targetProcessCommitUsage_ = { 0 };
 
     std::vector<FLOAT_ULONG64> dataList_;
     std::vector<PETP_GPU_ADAPTER> gpuAdapterList_;

@@ -42,3 +42,4 @@ typedef struct _RTL_HEAP_PARAMETERS {
 } RTL_HEAP_PARAMETERS, * PRTL_HEAP_PARAMETERS;
 
 #endif // !_NTIFS_H
+
