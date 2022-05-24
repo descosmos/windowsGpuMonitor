@@ -43,7 +43,7 @@ extern RtlInitializeBitMap fnRtlInitializeBitMap;
 
 GpuMonitor::GpuMonitor(DWORD targetProcessId): targetProcessId_(targetProcessId)
 {
-	dataList_.resize(5);
+	dataList_.resize(8);
 }
 
 GpuMonitor::~GpuMonitor()
@@ -53,6 +53,12 @@ GpuMonitor::~GpuMonitor()
 bool GpuMonitor::start()
 {
 	PhInitializeWindowsVersion();
+
+	if (!escalationRightOfCurrentProcess())
+	{
+		LOGE << TAG << "escalationRightOfCurrentProcess failed.\n";
+		return false;
+	}
 
 	if (!openTargetProcessHandle(targetProcessId_))
 	{
@@ -98,7 +104,7 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 		for (i = 0; i < EtGpuTotalNodeCount_; i++)
 		{
 			FLOAT usage = (FLOAT)(EtGpuNodesTotalRunningTimeDelta_[i].Delta / elapsedTime);
-			LOGI << TAG << "EtGpuNodesTotalRunningTimeDelta_[" << i << "]->Delta "<< usage <<".\n";
+			LOGI << TAG << "EtGpuTotalNodeCount_[" << i << "] usage: "<< usage <<".\n";
 
 			if (usage > 1)
 				usage = 1;
@@ -118,8 +124,10 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 
 		// HACK
 		if (targetProcessGpuUtilization_ > EtGpuNodeUsage_)
+		{
 			targetProcessGpuUtilization_ = EtGpuNodeUsage_;
-
+		}
+			
 		//for (i = 0; i < EtGpuTotalNodeCount; i++)
 		//{
 		//    FLOAT usage = (FLOAT)(block->GpuTotalRunningTimeDelta[i].Delta / elapsedTime);
@@ -130,8 +138,12 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 		//    }
 		//}
 
+
 		if (targetProcessGpuUtilization_ > 1)
+		{
 			targetProcessGpuUtilization_ = 1;
+		}
+			
 
 		//if (runCount != 0)
 		//{
@@ -148,6 +160,9 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 	dataList_[GPU_DEDICATED_LIMIT].ulong64_ = EtGpuDedicatedLimit_;
 	dataList_[GPU_TARGET_PROCESS_SHARED_USAGE].ulong64_ = targetProcessGpuSharedUsage_;
 	dataList_[GPU_SHARED_LIMIT].ulong64_ = EtGpuSharedLimit_;
+	dataList_[GPU_SYSTEM_DEDICATED_USAGE].ulong64_ = EtGpuDedicatedUsage_;
+	dataList_[GPU_SYSTEM_SHARED_USAGE].ulong64_ = EtGpuSharedUsage_;
+	dataList_[GPU_SYSTEM_UTILIZATION].float_ = EtGpuNodeUsage_;
 
 	runCount++;
 
@@ -382,6 +397,38 @@ bool GpuMonitor::PhInitializeWindowsVersion()
 	return true;
 }
 
+bool GpuMonitor::escalationRightOfCurrentProcess()
+{
+	HANDLE token_handle;
+	if (!OpenProcessToken(GetCurrentProcess(),TOKEN_ALL_ACCESS, &token_handle))
+	{
+		LOGE << TAG << "openProcessToken error.\n";
+		return false;
+	}
+
+	LUID luid;
+
+	if (!LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid))
+	{
+		LOGE << TAG << "lookupPrivilegevalue error.\n";
+		return false;
+	}
+
+	TOKEN_PRIVILEGES tkp;
+	tkp.PrivilegeCount = 1;
+	tkp.Privileges[0].Luid = luid;
+	tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+	if (!AdjustTokenPrivileges(token_handle, FALSE, &tkp, sizeof(tkp), NULL, NULL))
+	{
+		LOGE << TAG << "adjust error.\n";
+		return false;
+	}
+
+	LOGI << TAG << "escalate rights for current process successfully.\n";
+
+	return true;
+}
+
 bool GpuMonitor::openTargetProcessHandle(DWORD pid)
 {
 //#ifdef DEBUG
@@ -389,10 +436,11 @@ bool GpuMonitor::openTargetProcessHandle(DWORD pid)
 //	return true;
 //#endif
 
-	targetProcessHandle_ = OpenProcess(PROCESS_ALL_ACCESS, FALSE, targetProcessId_);
+	targetProcessHandle_ = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, targetProcessId_);
 	if (!targetProcessHandle_)
 	{
 		LOGE << TAG << "OpenProcess failed.\n";
+		LOGE << TAG << "Error Number: " << GetLastError() << "\n";
 		return false;
 	}
 	return true;
@@ -522,8 +570,13 @@ void GpuMonitor::EtpUpdateSystemNodeInformation()
 				//systemRunningTime = queryStatistics.QueryResult.NodeInformation.SystemInformation.RunningTime.QuadPart;
 
 				//PhUpdateDelta(&EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j], runningTime);
+				LOGI << TAG << "runningTime: " << runningTime << " EtGpuNodesTotalRunningTimeDelta_[j].Value: " << EtGpuNodesTotalRunningTimeDelta_[j].Value << "\n";
 				EtGpuNodesTotalRunningTimeDelta_[j].Delta = runningTime - EtGpuNodesTotalRunningTimeDelta_[j].Value;
 				EtGpuNodesTotalRunningTimeDelta_[j].Value = runningTime;
+			}
+			else
+			{
+				LOGE << TAG << "D3DKMT_QUERYSTATISTICS_NODE D3DKMTQueryStatistics failed.\n";
 			}
 		}
 	}
@@ -600,52 +653,62 @@ void GpuMonitor::EtpUpdateProcessSegmentInformation()
 		}
 		else
 		{
-			LOGE << TAG << "D3DKMT_QUERYSTATISTICS D3DKMTQueryStatistics failed.\n";
+			LOGE << TAG << "D3DKMT_QUERYSTATISTICS_PROCESS D3DKMTQueryStatistics failed.\n";
 		}
 	}
 
 	targetProcessGpuDedicatedUsage_ = dedicatedUsage;
-	LOGI << TAG << "targetProcessGpuDedicatedUsage_: " << targetProcessGpuDedicatedUsage_ << "\n";
+	//LOGI << TAG << "targetProcessGpuDedicatedUsage_: " << targetProcessGpuDedicatedUsage_ << "\n";
 	targetProcessGpuSharedUsage_ = sharedUsage;
-	LOGI << TAG << "targetProcessGpuSharedUsage_: " << targetProcessGpuSharedUsage_ << "\n";
+	//LOGI << TAG << "targetProcessGpuSharedUsage_: " << targetProcessGpuSharedUsage_ << "\n";
 	targetProcessCommitUsage_ = commitUsage;
-	LOGI << TAG << "targetProcessGpuSharedUsage_: " << targetProcessGpuSharedUsage_ << "\n";
+	//LOGI << TAG << "targetProcessGpuSharedUsage_: " << targetProcessGpuSharedUsage_ << "\n";
 }
 
 void GpuMonitor::EtpUpdateProcessNodeInformation()
 {
+	ULONG i;
+	ULONG j;
 	PETP_GPU_ADAPTER gpuAdapter;
 	D3DKMT_QUERYSTATISTICS queryStatistics;
-	LARGE_INTEGER performanceCounter;
+	ULONG64 totalRunningTime;
 
-	for (ULONG i = 0; i < gpuAdapterList_.size(); i++)
+	if (!targetProcessHandle_)
+	{
+		LOGE << TAG << "targetProcessHandle_ is NULL.\n";
+		return;
+	}
+
+	totalRunningTime = 0;
+
+	for (i = 0; i < gpuAdapterList_.size(); i++)
 	{
 		gpuAdapter = gpuAdapterList_[i];
 
-		for (ULONG j = 0; j < gpuAdapter->NodeCount; j++)
+		for (j = 0; j < gpuAdapter->NodeCount; j++)
 		{
 			memset(&queryStatistics, 0, sizeof(D3DKMT_QUERYSTATISTICS));
-			queryStatistics.Type = D3DKMT_QUERYSTATISTICS_NODE;
+			queryStatistics.Type = D3DKMT_QUERYSTATISTICS_PROCESS_NODE;
 			queryStatistics.AdapterLuid = gpuAdapter->AdapterLuid;
-			queryStatistics.QueryNode.NodeId = j;
+			queryStatistics.hProcess = targetProcessHandle_;
+			queryStatistics.QueryProcessNode.NodeId = j;
 
 			if (NT_SUCCESS(D3DKMTQueryStatistics(&queryStatistics)))
 			{
-				ULONG64 runningTime;
-				//ULONG64 systemRunningTime;
+				//ULONG64 runningTime;
+				//runningTime = queryStatistics.QueryResult.ProcessNodeInformation.RunningTime.QuadPart;
+				//PhUpdateDelta(&Block->GpuTotalRunningTimeDelta[j], runningTime);
 
-				runningTime = queryStatistics.QueryResult.NodeInformation.GlobalInformation.RunningTime.QuadPart;
-				//systemRunningTime = queryStatistics.QueryResult.NodeInformation.SystemInformation.RunningTime.QuadPart;
-
-				//PhUpdateDelta(&EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j], runningTime);
-				EtGpuNodesTotalRunningTimeDelta_[j].Delta = runningTime - EtGpuNodesTotalRunningTimeDelta_[j].Value;
-				EtGpuNodesTotalRunningTimeDelta_[j].Value = runningTime;
+				totalRunningTime += queryStatistics.QueryResult.ProcessNodeInformation.RunningTime.QuadPart;
+				//totalContextSwitches += queryStatistics.QueryResult.ProcessNodeInformation.ContextSwitch;
+			}
+			else 
+			{
+				LOGE << TAG << "D3DKMT_QUERYSTATISTICS_PROCESS_NODE D3DKMTQueryStatistics failed.\n";
 			}
 		}
 	}
 
-	
-	PhQueryPerformanceCounter(&performanceCounter, &EtClockTotalRunningTimeFrequency_);
-	PhUpdateDelta(&EtClockTotalRunningTimeDelta_, performanceCounter.QuadPart);
+	PhUpdateDelta(&GpuRunningTimeDelta_, totalRunningTime);
 }
 

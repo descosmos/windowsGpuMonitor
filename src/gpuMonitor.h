@@ -64,7 +64,10 @@ enum GpuMonitorDataIndex
     GPU_TARGET_PROCESS_DEDICATED_USAGE = 1,
     GPU_DEDICATED_LIMIT = 2,
     GPU_TARGET_PROCESS_SHARED_USAGE = 3,
-    GPU_SHARED_LIMIT = 4
+    GPU_SHARED_LIMIT = 4,
+    GPU_SYSTEM_DEDICATED_USAGE = 5,
+    GPU_SYSTEM_SHARED_USAGE = 6,
+    GPU_SYSTEM_UTILIZATION = 7
 };
 
 union FLOAT_ULONG64
@@ -88,6 +91,7 @@ private:
     bool initializeD3DStatistics();
     bool PhHeapInitialization(SIZE_T HeapReserveSize, SIZE_T HeapCommitSize);
     bool PhInitializeWindowsVersion();
+    bool escalationRightOfCurrentProcess();
     bool openTargetProcessHandle(DWORD pid);
     bool EtpIsGpuSoftwareDevice(_In_ D3DKMT_HANDLE AdapterHandle);
     NTSTATUS EtQueryAdapterInformation(

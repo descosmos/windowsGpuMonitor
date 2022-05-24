@@ -24,7 +24,8 @@ set(SRC_SOURCES
 	"config/phnt_windows.h" 
 	"config/ntrtl.h" 
 	"config/refp.h" 
-	"config/phsup.h")
+	"config/phsup.h"
+	)
 
 set(UTILS_SOURCES
 	"utils/common.h"
@@ -38,6 +39,6 @@ set(UTILS_SOURCES
 
 
 # Add source to this project's executable.
-add_executable (descosmos_gpu_monitor "descosmos_gpu_monitor.cpp" ${UTILS_SOURCES} ${SRC_SOURCES})
+add_executable (descosmos_gpu_monitor "main.cpp" ${UTILS_SOURCES} ${SRC_SOURCES})
 
 # TODO: Add tests and install targets if needed.
