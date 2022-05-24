@@ -86,8 +86,6 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 	DOUBLE elapsedTime = 0; // total GPU node elapsed time in micro-seconds
 	FLOAT tempGpuUsage = 0;
 	ULONG i;
-	PLIST_ENTRY listEntry;
-	FLOAT maxNodeValue = 0;
 	//PET_PROCESS_BLOCK maxNodeBlock = NULL;
 
 	EtpUpdateSystemSegmentInformation();
@@ -187,7 +185,6 @@ bool GpuMonitor::initializeD3DStatistics()
 	PWSTR deviceInterface;
 	D3DKMT_OPENADAPTERFROMDEVICENAME openAdapterFromDeviceName;
 	D3DKMT_QUERYSTATISTICS queryStatistics;
-	D3DKMT_ADAPTER_PERFDATACAPS perfCaps;
 
 	if (CM_Get_Device_Interface_List_Size(
 		&deviceInterfaceListLength,
@@ -286,11 +283,13 @@ bool GpuMonitor::initializeD3DStatistics()
 			gpuAdapter->AdapterLuid = openAdapterFromDeviceName.AdapterLuid;
 			gpuAdapter->NodeCount = queryStatistics.QueryResult.AdapterInformation.NodeCount;
 			gpuAdapter->SegmentCount = queryStatistics.QueryResult.AdapterInformation.NbSegments;
+			gpuAdapter->FirstNodeIndex = EtGpuNextNodeIndex_;
 			fnRtlInitializeBitMap(&gpuAdapter->ApertureBitMap, gpuAdapter->ApertureBitMapBuffer, queryStatistics.QueryResult.AdapterInformation.NbSegments);
 			gpuAdapterList_.push_back(gpuAdapter);
 
 			EtGpuTotalNodeCount_ += queryStatistics.QueryResult.AdapterInformation.NodeCount;
 			EtGpuTotalSegmentCount_ += queryStatistics.QueryResult.AdapterInformation.NbSegments;
+			EtGpuNextNodeIndex_ += gpuAdapter->NodeCount;
 
 			for (ULONG ii = 0; ii < queryStatistics.QueryResult.AdapterInformation.NbSegments; ii++)
 			{
@@ -570,9 +569,9 @@ void GpuMonitor::EtpUpdateSystemNodeInformation()
 				//systemRunningTime = queryStatistics.QueryResult.NodeInformation.SystemInformation.RunningTime.QuadPart;
 
 				//PhUpdateDelta(&EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j], runningTime);
-				LOGI << TAG << "runningTime: " << runningTime << " EtGpuNodesTotalRunningTimeDelta_[j].Value: " << EtGpuNodesTotalRunningTimeDelta_[j].Value << "\n";
-				EtGpuNodesTotalRunningTimeDelta_[j].Delta = runningTime - EtGpuNodesTotalRunningTimeDelta_[j].Value;
-				EtGpuNodesTotalRunningTimeDelta_[j].Value = runningTime;
+				LOGI << TAG << "runningTime: " << runningTime << " EtGpuNodesTotalRunningTimeDelta_[" << gpuAdapter->FirstNodeIndex + j << "].Value: " << EtGpuNodesTotalRunningTimeDelta_[j].Value << "\n";
+				EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j].Delta = runningTime - EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j].Value;
+				EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j].Value = runningTime;
 			}
 			else
 			{

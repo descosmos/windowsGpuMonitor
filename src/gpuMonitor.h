@@ -29,7 +29,7 @@ typedef struct _ETP_GPU_ADAPTER
     LUID AdapterLuid;
     ULONG SegmentCount;
     ULONG NodeCount;
-    //ULONG FirstNodeIndex;
+    ULONG FirstNodeIndex;
 
     //PPH_STRING DeviceInterface;
     //PPH_STRING Description;
@@ -123,6 +123,7 @@ private:
 
     ULONG EtGpuTotalNodeCount_ = 0;
     ULONG EtGpuTotalSegmentCount_ = 0;
+    ULONG EtGpuNextNodeIndex_ = 0;
 
     PH_UINT64_DELTA EtClockTotalRunningTimeDelta_ = { 0, 0 };
     LARGE_INTEGER EtClockTotalRunningTimeFrequency_ = { 0 };
