@@ -4,7 +4,7 @@
 #include <iostream>
 
 #ifndef DEBUG
-#define DEBUG
+//#define DEBUG
 #endif
 
 #define LOGI std::cout

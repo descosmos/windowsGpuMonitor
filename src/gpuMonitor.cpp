@@ -53,6 +53,7 @@ GpuMonitor::~GpuMonitor()
 bool GpuMonitor::start()
 {
 	PhInitializeWindowsVersion();
+	LOGI << TAG << "Windows version: " << windowsVersion_ << "\n";
 
 	if (!escalationRightOfCurrentProcess())
 	{
@@ -91,19 +92,22 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 	EtpUpdateSystemSegmentInformation();
 	EtpUpdateSystemNodeInformation();
 
+	elapsedTime = (DOUBLE)(EtClockTotalRunningTimeDelta_.Delta * 10000000) / EtClockTotalRunningTimeFrequency_.QuadPart;
+
+#ifdef DEBUG
 	LOGI << TAG << "EtClockTotalRunningTimeDelta_.Delta: " << EtClockTotalRunningTimeDelta_.Delta << "\n";
 	LOGI << TAG << "EtClockTotalRunningTimeFrequency_.QuadPart: " << EtClockTotalRunningTimeFrequency_.QuadPart << "\n";
-
-	elapsedTime = (DOUBLE)(EtClockTotalRunningTimeDelta_.Delta * 10000000) / EtClockTotalRunningTimeFrequency_.QuadPart;
 	LOGI << TAG << "elapsedTime: " << elapsedTime << "\n";
+#endif
 
 	if (elapsedTime != 0)
 	{
 		for (i = 0; i < EtGpuTotalNodeCount_; i++)
 		{
 			FLOAT usage = (FLOAT)(EtGpuNodesTotalRunningTimeDelta_[i].Delta / elapsedTime);
+#ifdef DEBUG
 			LOGI << TAG << "EtGpuTotalNodeCount_[" << i << "] usage: "<< usage <<".\n";
-
+#endif
 			if (usage > 1)
 				usage = 1;
 
@@ -114,8 +118,8 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 
 	EtGpuNodeUsage_ = tempGpuUsage;
 
-	EtpUpdateProcessSegmentInformation();
-	EtpUpdateProcessNodeInformation();
+	//EtpUpdateProcessSegmentInformation();
+	//EtpUpdateProcessNodeInformation();
 	if (elapsedTime != 0)
 	{
 		targetProcessGpuUtilization_ = (FLOAT)(GpuRunningTimeDelta_.Delta / elapsedTime);
@@ -163,8 +167,9 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 	dataList_[GPU_SYSTEM_UTILIZATION].float_ = EtGpuNodeUsage_;
 
 	runCount++;
-
+#ifdef DEBUG
 	LOGI << TAG << "collect successfully.\n";
+#endif
 	return dataList_;
 }
 
@@ -423,7 +428,9 @@ bool GpuMonitor::escalationRightOfCurrentProcess()
 		return false;
 	}
 
+#ifdef DEBUG
 	LOGI << TAG << "escalate rights for current process successfully.\n";
+#endif // DEBUG
 
 	return true;
 }
@@ -569,7 +576,9 @@ void GpuMonitor::EtpUpdateSystemNodeInformation()
 				//systemRunningTime = queryStatistics.QueryResult.NodeInformation.SystemInformation.RunningTime.QuadPart;
 
 				//PhUpdateDelta(&EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j], runningTime);
+#ifdef DEBUG
 				LOGI << TAG << "runningTime: " << runningTime << " EtGpuNodesTotalRunningTimeDelta_[" << gpuAdapter->FirstNodeIndex + j << "].Value: " << EtGpuNodesTotalRunningTimeDelta_[j].Value << "\n";
+#endif // DEBUG
 				EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j].Delta = runningTime - EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j].Value;
 				EtGpuNodesTotalRunningTimeDelta_[gpuAdapter->FirstNodeIndex + j].Value = runningTime;
 			}

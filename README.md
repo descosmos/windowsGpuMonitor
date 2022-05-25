@@ -1,9 +1,11 @@
 # Windows Gpu Monitor
-> Developed from Process Hacker2.
+> Windows Gpu Monitor is a performance tools to monitor GPU in windows platform. Developed from Process Hacker2. 
 
 ## build
 - platform: Windows
 - tools: visual studio 2019 (or later)
 
 ## Run
-run descosmos_gpu_monitor.exe
+> Windows Gpu Monitor only get the system Gpu data if you run it with ordinary user.
+> Run the descosmos_gpu_monitor.exe with administor right if you want receive the Gpu data of specific process.
+run descosmos_gpu_monitor.exe <pid>

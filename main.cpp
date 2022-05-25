@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
         //LOGI << TAG << "GPU_TARGET_PROCESS_SHARED_USAGE: " << dataList[GPU_TARGET_PROCESS_SHARED_USAGE].ulong64_ << "\n";
         //LOGI << TAG << "GPU_SHARED_LIMIT: " << dataList[GPU_SHARED_LIMIT].ulong64_ << "\n";
 
-        LOGI << "\n================================\n";
+        LOGI << "\n===============================================================\n";
         LOGI << TAG << "GPU_TARGET_PROCESS_UTILIZATION:     " << dataList[GPU_TARGET_PROCESS_UTILIZATION].float_ << "\n";
         LOGI << TAG << "GPU_SYSTEM_UTILIZATION:             " << dataList[GPU_SYSTEM_UTILIZATION].float_ << "\n";
         LOGI << TAG << "GPU_TARGET_PROCESS_DEDICATED_USAGE: " << dataList[GPU_TARGET_PROCESS_DEDICATED_USAGE].ulong64_ / 1024 / 1024 << "MB \n";
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
         LOGI << TAG << "GPU_SHARED_LIMIT:                   " << dataList[GPU_SHARED_LIMIT].ulong64_ / 1024 / 1024 << "MB \n";
         LOGI << TAG << "GPU_SYSTEM_DEDICATED_USAGE:         " << dataList[GPU_SYSTEM_DEDICATED_USAGE].ulong64_ / 1024 / 1024 << "MB \n";
         LOGI << TAG << "GPU_SYSTEM_SHARED_USAGE:            " << dataList[GPU_SYSTEM_SHARED_USAGE].ulong64_ / 1024 / 1024 << "MB \n";
-        LOGI << "================================\n";
+        LOGI << "===============================================================\n";
     }
     
 
