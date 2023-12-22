@@ -27,8 +27,10 @@ extern ULONG WindowsVersion;
 #define WINDOWS_10_20H2 110 // October, 2020
 #define WINDOWS_10_21H1 111 // May, 2021
 #define WINDOWS_10_21H2 112 // November, 2021
-#define WINDOWS_11 113 // October, 2021
-#define WINDOWS_11_22H1 114 // February, 2022
+#define WINDOWS_10_22H2 113 // October, 2022
+#define WINDOWS_11 114 // October, 2021
+#define WINDOWS_11_22H2 115 // September, 2022
+#define WINDOWS_11_23H2 116 // October, 2023
 #define WINDOWS_NEW ULONG_MAX
 
 #ifdef __cplusplus

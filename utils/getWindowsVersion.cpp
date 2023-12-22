@@ -53,13 +53,25 @@ ULONG getWindowsVersion() {
     // Windows 10, Windows Server 2016
     else if (majorVersion == 10 && minorVersion == 0)
     {
-        if (buildVersion >= 22500)
+        if (buildVersion > 22631)
         {
-            WindowsVersion = WINDOWS_11_22H1;
+            WindowsVersion = WINDOWS_NEW;
+        }
+        else if (buildVersion >= 22631)
+        {
+            WindowsVersion = WINDOWS_11_23H2;
+        }
+        else if (buildVersion >= 22621)
+        {
+            WindowsVersion = WINDOWS_11_22H2;
         }
         else if (buildVersion >= 22000)
         {
             WindowsVersion = WINDOWS_11;
+        }
+        else if (buildVersion >= 19045)
+        {
+            WindowsVersion = WINDOWS_10_22H2;
         }
         else if (buildVersion >= 19044)
         {
