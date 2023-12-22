@@ -10,6 +10,11 @@
 #include <d3d11.h>
 #include <winternl.h>
 #include <winnt.h>
+#include <process.h>
+#include <tchar.h>
+#include <Psapi.h>
+#include <tlhelp32.h>
+#include <psapi.h>
 #include "gpuMonitor.h"
 #include "../config/phconfig.h"
 #include "../config/phnt.h"
@@ -23,7 +28,7 @@
 #include "../utils/Handles.h"
 #include "../utils/baseup.h"
 
-static const char* TAG = "gpuMonitor.cpp:\t";
+static const char* TAG = __FILE__ " ";
 
 extern RtlCreateHeap fnRtlCreateHeap;
 extern RtlDestroyHeap fnRtlDestroyHeap;
@@ -41,7 +46,68 @@ extern RtlInitializeBitMap fnRtlInitializeBitMap;
 //extern D3DKMTOpenAdapterFromDeviceName fnD3DKMTOpenAdapterFromDeviceName;
 //extern D3DKMTQueryAdapterInfo fnD3DKMTQueryAdapterInfo;
 
-GpuMonitor::GpuMonitor(DWORD targetProcessId): targetProcessId_(targetProcessId)
+using EtPerfCounterInitializationType = VOID(*) (VOID);
+using EtUpdatePerfCounterDataType = NTSTATUS(*) (VOID);
+using EtLookupTotalGpuSharedType = ULONG64(*) (VOID);
+using EtLookupTotalGpuDedicatedType = ULONG64(*) (VOID);
+
+EtPerfCounterInitializationType EtPerfCounterInitialization = nullptr;
+EtUpdatePerfCounterDataType EtUpdatePerfCounterData = nullptr;
+EtLookupTotalGpuSharedType EtLookupTotalGpuShared = nullptr;
+EtLookupTotalGpuDedicatedType EtLookupTotalGpuDedicated = nullptr;
+
+
+bool LoadDLL()
+{
+	HMODULE GPUMonDLLModule = 0;
+	do
+	{
+		GPUMonDLLModule = LoadLibrary("D:\\projects\\c++\\windowsGpuMonitor\\bin\\GPUMonDLL.dll");
+		LOGI << TAG << __LINE__ << " still waiting.\n";
+		Sleep(100);
+	} while (GPUMonDLLModule == nullptr);
+
+	if (GPUMonDLLModule)
+	{
+		LOGI << TAG << __LINE__ << " GPUMonDLLModule isn't NULL.\n";
+	}
+
+	EtPerfCounterInitialization = (EtPerfCounterInitializationType)GetProcAddress(GPUMonDLLModule, "EtPerfCounterInitialization");
+	if (EtPerfCounterInitialization == nullptr)
+	{
+		LOGI << TAG << __LINE__ << " EtPerfCounterInitialization == nullptr.\n";
+	}
+
+	EtUpdatePerfCounterData = (EtUpdatePerfCounterDataType)GetProcAddress(GPUMonDLLModule, "EtUpdatePerfCounterData");
+	if (EtUpdatePerfCounterData == nullptr)
+	{
+		LOGI << TAG << __LINE__ << " EtUpdatePerfCounterData == nullptr.\n";
+	}
+
+	EtLookupTotalGpuShared = (EtLookupTotalGpuSharedType)GetProcAddress(GPUMonDLLModule, "EtLookupTotalGpuShared");
+	if (EtLookupTotalGpuShared == nullptr)
+	{
+		LOGI << TAG << __LINE__ << " EtLookupTotalGpuShared == nullptr.\n";
+	}
+
+	EtLookupTotalGpuDedicated = (EtLookupTotalGpuDedicatedType)GetProcAddress(GPUMonDLLModule, "EtLookupTotalGpuDedicated");
+	if (EtLookupTotalGpuDedicated == nullptr)
+	{
+		LOGI << TAG << __LINE__ << " EtLookupTotalGpuDedicated == nullptr.\n";
+	}
+
+	return EtPerfCounterInitialization != nullptr &&
+		EtUpdatePerfCounterData != nullptr &&
+		EtLookupTotalGpuShared != nullptr &&
+		EtLookupTotalGpuDedicated != nullptr;
+}
+
+GpuMonitor::GpuMonitor()
+{
+	dataList_.resize(8);
+}
+
+GpuMonitor::GpuMonitor(DWORD targetProcessId) : targetProcessId_(targetProcessId)
 {
 	dataList_.resize(8);
 }
@@ -55,16 +121,24 @@ bool GpuMonitor::start()
 	PhInitializeWindowsVersion();
 	LOGI << TAG << "Windows version: " << windowsVersion_ << "\n";
 
+	if (!LoadDLL())
+	{
+		return false;
+	}
+
 	if (!escalationRightOfCurrentProcess())
 	{
 		LOGE << TAG << "escalationRightOfCurrentProcess failed.\n";
 		return false;
 	}
 
-	if (!openTargetProcessHandle(targetProcessId_))
+	if (targetProcessId_ != 0)
 	{
-		LOGE << TAG << "openTargetProcessHandle failed.\n";
-		return false;
+		if (!openTargetProcessHandle(targetProcessId_))
+		{
+			LOGE << TAG << "openTargetProcessHandle failed.\n";
+			return false;
+		}
 	}
 
 	PhHeapInitialization(0, 0);
@@ -74,6 +148,11 @@ bool GpuMonitor::start()
 
 	if (initializeD3DStatistics()) {
 		EtGpuEnabled_ = true;
+	}
+
+	if (EtD3DEnabled_)
+	{
+		EtPerfCounterInitialization();
 	}
 
 	EtGpuNodesTotalRunningTimeDelta_.resize(EtGpuTotalNodeCount_);
@@ -89,71 +168,88 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 	ULONG i;
 	//PET_PROCESS_BLOCK maxNodeBlock = NULL;
 
-	EtpUpdateSystemSegmentInformation();
-	EtpUpdateSystemNodeInformation();
-
-	elapsedTime = (DOUBLE)(EtClockTotalRunningTimeDelta_.Delta * 10000000) / EtClockTotalRunningTimeFrequency_.QuadPart;
-
-#ifdef DEBUG
-	LOGI << TAG << "EtClockTotalRunningTimeDelta_.Delta: " << EtClockTotalRunningTimeDelta_.Delta << "\n";
-	LOGI << TAG << "EtClockTotalRunningTimeFrequency_.QuadPart: " << EtClockTotalRunningTimeFrequency_.QuadPart << "\n";
-	LOGI << TAG << "elapsedTime: " << elapsedTime << "\n";
-#endif
-
-	if (elapsedTime != 0)
+	if (EtD3DEnabled_)
 	{
-		for (i = 0; i < EtGpuTotalNodeCount_; i++)
-		{
-			FLOAT usage = (FLOAT)(EtGpuNodesTotalRunningTimeDelta_[i].Delta / elapsedTime);
-#ifdef DEBUG
-			LOGI << TAG << "EtGpuTotalNodeCount_[" << i << "] usage: "<< usage <<".\n";
-#endif
-			if (usage > 1)
-				usage = 1;
+		//LOGI << TAG << __LINE__ << " Enter EtD3DEnabled_.\n";
+		EtUpdatePerfCounterData();
 
-			if (usage > tempGpuUsage)
-				tempGpuUsage = usage;
-		}
+		EtGpuDedicatedUsage_ = EtLookupTotalGpuDedicated();
+		EtGpuSharedUsage_ = EtLookupTotalGpuShared();
 	}
-
-	EtGpuNodeUsage_ = tempGpuUsage;
-
-	//EtpUpdateProcessSegmentInformation();
-	//EtpUpdateProcessNodeInformation();
-	if (elapsedTime != 0)
+	else
 	{
-		targetProcessGpuUtilization_ = (FLOAT)(GpuRunningTimeDelta_.Delta / elapsedTime);
+		//LOGI << TAG << __LINE__ << " Enter else.\n";
 
-		// HACK
-		if (targetProcessGpuUtilization_ > EtGpuNodeUsage_)
+		EtpUpdateSystemSegmentInformation();
+		EtpUpdateSystemNodeInformation();
+
+		elapsedTime = (DOUBLE)(EtClockTotalRunningTimeDelta_.Delta * 10000000) / EtClockTotalRunningTimeFrequency_.QuadPart;
+
+#ifdef DEBUG
+		LOGI << TAG << "EtClockTotalRunningTimeDelta_.Delta: " << EtClockTotalRunningTimeDelta_.Delta << "\n";
+		LOGI << TAG << "EtClockTotalRunningTimeFrequency_.QuadPart: " << EtClockTotalRunningTimeFrequency_.QuadPart << "\n";
+		LOGI << TAG << "elapsedTime: " << elapsedTime << "\n";
+#endif
+
+		if (elapsedTime != 0)
 		{
-			targetProcessGpuUtilization_ = EtGpuNodeUsage_;
+			for (i = 0; i < EtGpuTotalNodeCount_; i++)
+			{
+				FLOAT usage = (FLOAT)(EtGpuNodesTotalRunningTimeDelta_[i].Delta / elapsedTime);
+#ifdef DEBUG
+				LOGI << TAG << "EtGpuTotalNodeCount_[" << i << "] usage: " << usage << ".\n";
+#endif
+				if (usage > 1)
+					usage = 1;
+
+				if (usage > tempGpuUsage)
+					tempGpuUsage = usage;
+			}
 		}
-			
-		//for (i = 0; i < EtGpuTotalNodeCount; i++)
-		//{
-		//    FLOAT usage = (FLOAT)(block->GpuTotalRunningTimeDelta[i].Delta / elapsedTime);
-		//
-		//    if (usage > block->GpuNodeUtilization)
-		//    {
-		//        block->GpuNodeUtilization = usage;
-		//    }
-		//}
 
+		EtGpuNodeUsage_ = tempGpuUsage;
 
-		if (targetProcessGpuUtilization_ > 1)
+		//EtpUpdateProcessSegmentInformation();
+		//EtpUpdateProcessNodeInformation();
+
+		if (targetProcessId_ != 0)
 		{
-			targetProcessGpuUtilization_ = 1;
-		}
-			
 
-		//if (runCount != 0)
-		//{
-		//	targetProcessGpuUtilization_ = GpuNodeUtilization_;
-		//	targetProcessGpuDedicatedUsage_ = (ULONG)(block->GpuDedicatedUsage / PAGE_SIZE);
-		//	targetProcessGpuSharedUsage_ = (ULONG)(block->GpuSharedUsage / PAGE_SIZE);
-		//	targetProcessCommitUsage_ = (ULONG)(block->GpuCommitUsage / PAGE_SIZE);
-		//}
+			if (elapsedTime != 0)
+			{
+				targetProcessGpuUtilization_ = (FLOAT)(GpuRunningTimeDelta_.Delta / elapsedTime);
+
+				// HACK
+				if (targetProcessGpuUtilization_ > EtGpuNodeUsage_)
+				{
+					targetProcessGpuUtilization_ = EtGpuNodeUsage_;
+				}
+
+				//for (i = 0; i < EtGpuTotalNodeCount; i++)
+				//{
+				//    FLOAT usage = (FLOAT)(block->GpuTotalRunningTimeDelta[i].Delta / elapsedTime);
+				//
+				//    if (usage > block->GpuNodeUtilization)
+				//    {
+				//        block->GpuNodeUtilization = usage;
+				//    }
+				//}
+
+				if (targetProcessGpuUtilization_ > 1)
+				{
+					targetProcessGpuUtilization_ = 1;
+				}
+
+
+				//if (runCount != 0)
+				//{
+				//	targetProcessGpuUtilization_ = GpuNodeUtilization_;
+				//	targetProcessGpuDedicatedUsage_ = (ULONG)(block->GpuDedicatedUsage / PAGE_SIZE);
+				//	targetProcessGpuSharedUsage_ = (ULONG)(block->GpuSharedUsage / PAGE_SIZE);
+				//	targetProcessCommitUsage_ = (ULONG)(block->GpuCommitUsage / PAGE_SIZE);
+				//}
+			}
+		}
 	}
 
 	//	TODO: fixme
@@ -175,9 +271,12 @@ std::vector<FLOAT_ULONG64> GpuMonitor::collect()
 
 bool GpuMonitor::stop()
 {
-	if (targetProcessHandle_)
+	if (targetProcessId_ != 0)
 	{
-		return CloseHandle(targetProcessHandle_);
+		if (targetProcessHandle_)
+		{
+			return CloseHandle(targetProcessHandle_);
+		}
 	}
 	return true;
 }
@@ -387,7 +486,7 @@ bool GpuMonitor::PhHeapInitialization(SIZE_T HeapReserveSize, SIZE_T HeapCommitS
 	{
 		return false;
 	}
-		
+
 	return true;
 }
 
@@ -404,7 +503,7 @@ bool GpuMonitor::PhInitializeWindowsVersion()
 bool GpuMonitor::escalationRightOfCurrentProcess()
 {
 	HANDLE token_handle;
-	if (!OpenProcessToken(GetCurrentProcess(),TOKEN_ALL_ACCESS, &token_handle))
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &token_handle))
 	{
 		LOGE << TAG << "openProcessToken error.\n";
 		return false;
@@ -437,10 +536,10 @@ bool GpuMonitor::escalationRightOfCurrentProcess()
 
 bool GpuMonitor::openTargetProcessHandle(DWORD pid)
 {
-//#ifdef DEBUG
-//	targetProcessHandle = GetCurrentProcess();
-//	return true;
-//#endif
+	//#ifdef DEBUG
+	//	targetProcessHandle = GetCurrentProcess();
+	//	return true;
+	//#endif
 
 	targetProcessHandle_ = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, targetProcessId_);
 	if (!targetProcessHandle_)
@@ -710,7 +809,7 @@ void GpuMonitor::EtpUpdateProcessNodeInformation()
 				totalRunningTime += queryStatistics.QueryResult.ProcessNodeInformation.RunningTime.QuadPart;
 				//totalContextSwitches += queryStatistics.QueryResult.ProcessNodeInformation.ContextSwitch;
 			}
-			else 
+			else
 			{
 				LOGE << TAG << "D3DKMT_QUERYSTATISTICS_PROCESS_NODE D3DKMTQueryStatistics failed.\n";
 			}
@@ -719,4 +818,3 @@ void GpuMonitor::EtpUpdateProcessNodeInformation()
 
 	PhUpdateDelta(&GpuRunningTimeDelta_, totalRunningTime);
 }
-

@@ -79,7 +79,7 @@ union FLOAT_ULONG64
 
 class GpuMonitor {
 public:
-    GpuMonitor() = delete;
+    GpuMonitor();
     GpuMonitor(DWORD targetProcessId);
     ~GpuMonitor();
 
